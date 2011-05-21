@@ -4,7 +4,14 @@
  */
 package jabber.server;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.net.Socket;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -13,13 +20,78 @@ import java.net.Socket;
 public class Connection implements Runnable {
 
 	private Socket connection;
+	private OutputStreamWriter outputStreamWriter = null;
+	private InputStreamReader inputStreamReader = null;
 	
 	public Connection(Socket connection) {
 		this.connection = connection;
 	}
 
+	private OutputStreamWriter getBufferedOutputStream() throws IOException {
+		if (this.outputStreamWriter == null) {
+			this.outputStreamWriter = new OutputStreamWriter(new BufferedOutputStream(this.connection.getOutputStream()));
+		}
+		return this.outputStreamWriter;
+	}
+
+	private InputStreamReader getInputStreamReader() throws IOException {
+		if (this.inputStreamReader == null) {
+			this.inputStreamReader = new InputStreamReader(new BufferedInputStream(this.connection.getInputStream()), "UTF8");
+		}
+		return this.inputStreamReader;
+	}
+	
+	/**
+	 * Send message to client
+	 * 
+	 * @param message
+	 * @throws IOException 
+	 */
+	private void sendMessage(String message) throws IOException {
+		message += "\r\n";
+		this.getBufferedOutputStream().write(message);
+		this.getBufferedOutputStream().flush();
+	}
+	
+	private String receiveMessage() throws IOException {
+		int b;
+		StringBuilder message = new StringBuilder();
+		boolean waitForCR = true;
+		boolean waitForLF = false;
+		while((b = this.getInputStreamReader().read()) != -1) {
+			message.append((char)b);
+			if (waitForCR && (char)b == '\r') {
+				waitForLF = true;
+			}
+			if (waitForLF && (char)b == '\n') {
+				break;
+			} else if ((char)b == '\n' && !waitForLF) {
+				waitForCR = true;
+				waitForLF = false;
+			}
+		}
+		return message.toString();
+	}
+	
+	private void close() throws IOException {
+		this.connection.close();
+	}
+
 	@Override
 	public void run() {
-		System.out.println("Connection accepted from address " + connection.getInetAddress() + " on port " + connection.getPort());
+		try {
+			this.sendMessage(
+				"Connected to jabber server from ip adress: " + this.connection.getInetAddress() +
+				" and port " + this.connection.getPort()
+			);
+			this.sendMessage("You will close connection by typing BYE");
+			String message;
+			while (!(message = this.receiveMessage()).equals("BYE\r\n")) {
+				this.sendMessage("received: " + message);
+			}
+			this.close();
+		} catch (IOException ex) {
+			Logger.getLogger(Connection.class.getName()).log(Level.SEVERE, null, ex);
+		}
 	}
 }
