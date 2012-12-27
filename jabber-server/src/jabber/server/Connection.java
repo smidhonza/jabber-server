@@ -27,23 +27,31 @@ public class Connection implements Runnable {
 		this.connection = connection;
 	}
 
-	private OutputStreamWriter getBufferedOutputStream() throws IOException {
-		if (this.outputStreamWriter == null) {
-			this.outputStreamWriter = new OutputStreamWriter(new BufferedOutputStream(this.connection.getOutputStream()));
-		}
-		return this.outputStreamWriter;
-	}
+    @Override
+    public void run() {
+        try {
+            this.sendMessage(
+                    "Connected to jabber server from ip adress: " + this.connection.getInetAddress() +
+                            " and port " + this.connection.getPort()
+            );
+            this.sendMessage("You will close connection by typing BYE");
+            String message;
 
-	private InputStreamReader getInputStreamReader() throws IOException {
-		if (this.inputStreamReader == null) {
-			this.inputStreamReader = new InputStreamReader(new BufferedInputStream(this.connection.getInputStream()), "UTF8");
-		}
-		return this.inputStreamReader;
-	}
-	
+
+            XMLRequest request;
+            while (!(request = XMLRequestParser.parse(this.receiveMessage())).isCloseRequest()) {
+                this.sendMessage(request.getMessage());
+            }
+            Logger.getLogger(Connection.class.getName()).log(Level.INFO, "zmrde");
+            this.close();
+        } catch (IOException ex) {
+            Logger.getLogger(Connection.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
 	/**
 	 * Send message to client
-	 * 
+	 *
 	 * @param message
 	 * @throws IOException 
 	 */
@@ -54,6 +62,7 @@ public class Connection implements Runnable {
 	}
 	
 	private String receiveMessage() throws IOException {
+        Logger.getLogger(Connection.class.getName()).log(Level.INFO, "receiveMessage()");
 		int b;
 		StringBuilder message = new StringBuilder();
 		boolean waitForCR = true;
@@ -77,21 +86,17 @@ public class Connection implements Runnable {
 		this.connection.close();
 	}
 
-	@Override
-	public void run() {
-		try {
-			this.sendMessage(
-				"Connected to jabber server from ip adress: " + this.connection.getInetAddress() +
-				" and port " + this.connection.getPort()
-			);
-			this.sendMessage("You will close connection by typing BYE");
-			String message;
-			while (!(message = this.receiveMessage()).equals("BYE\r\n")) {
-				this.sendMessage("received: " + message);
-			}
-			this.close();
-		} catch (IOException ex) {
-			Logger.getLogger(Connection.class.getName()).log(Level.SEVERE, null, ex);
-		}
-	}
+    private OutputStreamWriter getBufferedOutputStream() throws IOException {
+        if (this.outputStreamWriter == null) {
+            this.outputStreamWriter = new OutputStreamWriter(new BufferedOutputStream(this.connection.getOutputStream()));
+        }
+        return this.outputStreamWriter;
+    }
+
+    private InputStreamReader getInputStreamReader() throws IOException {
+        if (this.inputStreamReader == null) {
+            this.inputStreamReader = new InputStreamReader(new BufferedInputStream(this.connection.getInputStream()), "UTF8");
+        }
+        return this.inputStreamReader;
+    }
 }
