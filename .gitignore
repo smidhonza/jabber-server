@@ -1,2 +1,4 @@
 .idea
 nbproject
+/jabber-server/build/
+/jabber-server/nbproject/

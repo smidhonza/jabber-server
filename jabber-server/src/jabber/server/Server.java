@@ -15,13 +15,16 @@ import java.util.logging.Logger;
  */
 public class Server implements Runnable {
 
+	private static int maxConnections = 10;
+
 	@Override
 	public void run() {
+		int i=0;
 		try {
 			Integer port = Integer.parseInt(Config.getInstance().getOption("port"));
-			
+
 			ServerSocket socket = new ServerSocket(port);
-			while (true) {
+			while (i++ < maxConnections) {
 				new Thread(new Connection(socket.accept())).start();
 			}
 		} catch (IOException ex) {
