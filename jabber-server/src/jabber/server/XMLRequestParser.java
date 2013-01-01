@@ -9,8 +9,7 @@ package jabber.server;
  */
 public class XMLRequestParser {
 
-
-    public static XMLRequest parse(String s) {
-            return new XMLRequest(s);
-        }
-    }
+	public static XMLRequest parse(String s) {
+		return new XMLRequest(s);
+	}
+}

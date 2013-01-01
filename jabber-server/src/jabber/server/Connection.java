@@ -1,91 +1,70 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package jabber.server;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
+import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.ArrayList;
 
 public class Connection implements Runnable {
 
-	private Socket connection;
-	private OutputStreamWriter outputStreamWriter = null;
-	private InputStreamReader inputStreamReader = null;
+	private ArrayList clients;
+	private Thread thread;
+	public ServerSocket serverSocket;
+	public Server server;
+	public int clientCount;
+	public int port;
 
-	public Connection(Socket connection) {
-		this.connection = connection;
+	public Connection(Server server, int port) {
+		this.server = server;
+		this.port = port;
+		try {
+			serverSocket = new ServerSocket(port);
+			server.log("Server starts on " + InetAddress.getLocalHost().getHostName());
+		} catch (Exception e) {
+			System.err.println("Can't make a socketconnection " + e);
+			System.exit(0);
+		}
+		clientCount = 0;
+		clients = new ArrayList();
+		thread = new Thread(this);
+		thread.start();
 	}
 
 	@Override
 	public void run() {
+		while (true) {
+			try {
+				Socket socket = serverSocket.accept();
+				broadcast(socket.getInetAddress() + " is connected");
+				clients.add(new Client(socket, this));
+			} catch (Exception e) {
+			}
+		}
+	}
+
+	public synchronized void broadcast(String msg) {
+		server.log(msg);
+		for (int i = 0; i < clients.size(); i++) {
+			Client client = (Client) clients.get(i);
+			client.sendMessage(msg);
+		}
+	}
+
+	public synchronized void killClient(Client client) {
+		String msg = client.socket.getInetAddress().toString();
 		try {
-			this.sendMessage(
-					"Connected to jabber server from ip adress: " + this.connection.getInetAddress()
-					+ " and port " + this.connection.getPort());
-			this.sendMessage("You will close connection by typing BYE");
-			String message;
-
-
-			XMLRequest request;
-			while (!(request = XMLRequestParser.parse(this.receiveMessage())).isCloseRequest()) {
-				this.sendMessage(request.getMessage());
+			client.in.close();
+			client.out.close();
+			client.socket.close();
+			for (int i = 0; i < clients.size(); i++) {
+				if (((Client) clients.get(i)).equals(client)) {
+					clients.remove(i);
+				}
 			}
-			Logger.getLogger(Connection.class.getName()).log(Level.INFO, request.getMessage());
-			this.close();
-		} catch (IOException ex) {
-			Logger.getLogger(Connection.class.getName()).log(Level.SEVERE, null, ex);
+			clients.trimToSize();
+			clientCount--;
+		} catch (Exception e) {
 		}
-	}
-
-	private void sendMessage(String message) throws IOException {
-		message += "\r\n";
-		this.getBufferedOutputStream().write(message);
-		this.getBufferedOutputStream().flush();
-	}
-
-	private String receiveMessage() throws IOException {
-		Logger.getLogger(Connection.class.getName()).log(Level.INFO, "receiveMessage()");
-		int b;
-		StringBuilder message = new StringBuilder();
-		boolean waitForCR = true;
-		boolean waitForLF = false;
-		while ((b = this.getInputStreamReader().read()) != -1) {
-			message.append((char) b);
-			if (waitForCR && (char) b == '\r') {
-				waitForLF = true;
-			}
-			if (waitForLF && (char) b == '\n') {
-				break;
-			} else if ((char) b == '\n' && !waitForLF) {
-				waitForCR = true;
-				waitForLF = false;
-			}
-		}
-		return message.toString();
-	}
-
-	private void close() throws IOException {
-		this.connection.close();
-	}
-
-	private OutputStreamWriter getBufferedOutputStream() throws IOException {
-		if (this.outputStreamWriter == null) {
-			this.outputStreamWriter = new OutputStreamWriter(new BufferedOutputStream(this.connection.getOutputStream()));
-		}
-		return this.outputStreamWriter;
-	}
-
-	private InputStreamReader getInputStreamReader() throws IOException {
-		if (this.inputStreamReader == null) {
-			this.inputStreamReader = new InputStreamReader(new BufferedInputStream(this.connection.getInputStream()), "UTF8");
-		}
-		return this.inputStreamReader;
+		broadcast(msg + " has disconnected");
 	}
 }

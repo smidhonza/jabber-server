@@ -7,7 +7,7 @@ public class XMLRequest {
 
 	public XMLRequest(String s) {
 		this.message = s;
-		if (s.equals("BYE\r\n")) {
+		if (s.equals("BYE")) {
 			this.isCloseRequest = true;
 		} else {
 			this.isCloseRequest = false;
